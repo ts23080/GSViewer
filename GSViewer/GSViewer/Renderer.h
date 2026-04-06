@@ -1,28 +1,19 @@
 #pragma once
 #include <glad/glad.h>
 #include <string>
-#include <vector>
-#include "Loading.h" // Loading::GaussianSplat 構造体を参照するため
+#include "Loading.h"
 
 class Renderer {
 public:
     Renderer();
     ~Renderer();
 
-    // 1. シェーダーの初期化（.vert, .geo, .frag を読み込む）
-    bool InitShaders(const std::string& vPath, const std::string& gPath, const std::string& fPath);
-
-    // 2. SSBOの作成とデータ転送
+    bool Init(const std::string& v, const std::string& g, const std::string& f);
     void SetupBuffers(const Loading& loader);
 
-    // 3. 描画実行
-    void Render(int numSplats);
+    void Render(int num, float* view, float* proj, int w, int h);
 
 private:
-    GLuint m_program;     // シェーダープログラムID
-    GLuint m_ssbo;        // SSBO (GaussianSplatデータ用)
-    GLuint m_dummyVao;    // VAO (描画命令のキッカケ用)
-
-    // シェーダーコンパイル用の補助関数
-    GLuint CompileShader(GLenum type, const std::string& path);
+    GLuint m_program, m_ssbo, m_vao;
+    GLuint Compile(GLenum type, const std::string& path);
 };

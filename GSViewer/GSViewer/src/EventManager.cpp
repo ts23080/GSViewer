@@ -1,208 +1,102 @@
 #include "EventManager.h"
-#include "math.h"
-
+#include <iostream>
+#include <algorithm>
 
 EventManager::EventManager()
+    : m_isL(false), m_isR(false), m_isM(false),
+    m_camPos(0, 0, 0), m_camYaw(0), m_camPitch(0), m_camDist(5.0f)
 {
-  m_isL = false;
-  m_isR = false;
-  m_isM = false;
-  
-  m_ogl.SetCamera(EVec3f(0,0,10), EVec3f(0,0,0), EVec3f(0,1,0));
-  m_ogl.SetClearColor(EVec4f(0.2f, 0.2f, 0.5f, 1.0f));
-}
-
-void EventManager::LBtnDown(EVec2i p, bool ctrl, bool shift) 
-{
-  m_isL = true;
-  if (shift) 
-  {
-    m_stroke.clear();
-    EVec3f pos, dir;
-    m_ogl.GetCursorRay(p, pos, dir);
-    m_stroke.push_back(pos); // camera位置を開始点に入れておく
-    m_stroke.push_back(pos+10*dir); //奥行きは適当
-    m_b_drawstroke = true;
-  }
-  
-  m_prepos = p;
-}
-
-void EventManager::RBtnDown(EVec2i p, bool ctrl, bool shift) 
-{
-  m_isR = true;
-  m_prepos = p;
-}
-
-void EventManager::MBtnDown(EVec2i p, bool ctrl, bool shift) 
-{
-  m_isM = true;
-  m_prepos = p;
-}
-
-void EventManager::LBtnUp  (EVec2i p, bool ctrl, bool shift) 
-{
-  m_isL = false;
-  m_b_drawstroke = false;
-}
-
-void EventManager::RBtnUp  (EVec2i p, bool ctrl, bool shift) 
-{
-  m_isR = false;
-}
-
-void EventManager::MBtnUp  (EVec2i p, bool ctrl, bool shift) 
-{
-  m_isM = false;
-}
-
-void EventManager::MouseMove(EVec2i p) 
-{
-  if (!m_isL && !m_isR && !m_isM) return;
-  int dx = p.x() - m_prepos.x();
-  int dy = p.y() - m_prepos.y();
-
-  if (m_b_drawstroke)
-  {
-    EVec3f pos, dir;
-    m_ogl.GetCursorRay(p, pos, dir);
-    m_stroke.push_back(pos + 10 * dir);
-    std::cout << dir[0] << "," << dir[1] << "," << dir[2] << "\n";
-  }
-  else 
-  {
-    if (m_isL)
-      m_ogl.RotateCamera(dx, dy);
-    else if (m_isR)
-      m_ogl.TranslateCamera(dx, dy);
-    else if (m_isM)
-      m_ogl.ZoomCamera(dy);
-  }
-  m_prepos = p;
-}
-
-void EventManager::MouseWheel(int dx, int dy) {}
-void EventManager::KeyDown(int key) {}
-void EventManager::KeyUp(int key) {}
-
-
-static void DrawFrame()
-{
-  glDisable(GL_LIGHTING);
-  glLineWidth(2.0f);
-  
-  glBegin(GL_LINES);
-  glColor3f(1, 0, 0); glVertex3f(0, 0, 0); glVertex3f(5, 0, 0);
-  glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, 5, 0);
-  glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, 5);
-  glEnd();
-
-}
-
-static void DrawCube()
-{
-  // lighting
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_LIGHTING);
-  glEnable(GL_LIGHT0);
-
-  float lightPos[4] = { 10,10,10,1 };
-  glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
-
-  // material
-  float diff[4] = { 0.8f,0.5f,0.2f,1 };
-  float spec[4] = { 1,1,1,1 };
-  float amb[4] = { 0.2f,0.2f,0.2f,1 };
-  glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diff);
-  glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, spec);
-  glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, amb);
-  glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 50);
-  
-  //頂点 8個
-  EVec3f p[8] ={{-1,-1,-1}, { 1,-1,-1}, { 1, 1,-1}, {-1, 1,-1}, 
-                {-1,-1, 1}, { 1,-1, 1}, { 1, 1, 1}, {-1, 1, 1} };
-  //面 6個 (頂点インデックス 4個ずつ)
-  int face[6][4] = { {4,5,6,7}, {1,0,3,2}, {5,1,2,6},
-                     {0,4,7,3}, {7,6,2,3}, {0,1,5,4} };
-  EVec3f normal[6] = { { 0, 0, 1}, { 0, 0,-1}, { 1, 0, 0},
-                       {-1, 0, 0}, { 0, 1, 0}, { 0,-1, 0}};
-
-  glBegin(GL_QUADS);
-  for (int f = 0; f < 6; ++f)
-  {
-    glNormal3f(normal[f].x(), normal[f].y(), normal[f].z());
-    glVertex3fv(p[face[f][0]].data());
-    glVertex3fv(p[face[f][1]].data());
-    glVertex3fv(p[face[f][2]].data());
-    glVertex3fv(p[face[f][3]].data());
-  }
-  glEnd();
-  
-}
-
-
-EVec3f CalcPos(float theta, float phi)
-{
-  return EVec3f(
-    cos(theta) * cos(phi), 
-    sin(phi), 
-    -sin(theta) * cos(phi));
-}
-
-void DrawSphere(const EVec3f &pos,float rad)
-{
-  // lighting
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_LIGHTING);
-  glEnable(GL_LIGHT0);
-
-  float lightPos[4] = { 10,10,10,1 };
-  glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
-
-  // material
-  float diff[4] = { 0.0f,0.5f,0.8f,1 };
-  float spec[4] = { 1,1,1,1 };
-  float amb[4] = { 0.2f,0.2f,0.2f,1 };
-  glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diff);
-  glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, spec);
-  glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, amb);
-  glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 50);
-
-  const int n = 30;
-  
-  glTranslatef(pos[0], pos[1], pos[2]);
-  glBegin(GL_QUADS);
-  for (int t = 0; t < n; ++t)
-  {
-    for (int p = 0; p < n; ++p)
-    {
-      float t1 =    t    / (n - 1.0f) * M_PI * 2;
-      float t2 = (t + 1) / (n - 1.0f) * M_PI * 2;
-      float p1 =    p    / (n - 1.0f) * M_PI - M_PI / 2;
-      float p2 = (p + 1) / (n - 1.0f) * M_PI - M_PI / 2;
-      
-      EVec3f n0 = CalcPos(t1, p1), x0 = n0 * rad;
-      EVec3f n1 = CalcPos(t2, p1), x1 = n1 * rad;
-      EVec3f n2 = CalcPos(t2, p2), x2 = n2 * rad;
-      EVec3f n3 = CalcPos(t1, p2), x3 = n3 * rad;
-      glNormal3fv(n0.data()); glVertex3fv(x0.data());
-      glNormal3fv(n1.data()); glVertex3fv(x1.data());
-      glNormal3fv(n2.data()); glVertex3fv(x2.data());
-      glNormal3fv(n3.data()); glVertex3fv(x3.data());
+    if (m_loader.LoadFromPly("model.ply")) {
+        m_renderer.Init("splat.vert", "splat.geo", "splat.frag");
+        m_renderer.SetupBuffers(m_loader);
     }
-  }
-  glEnd();
-  glTranslatef( -pos[0], -pos[1], -pos[2]);
-
 }
 
+// 視点行列の作成 (LookAt)
+EMat4f EventManager::GetViewMatrix() {
+    // 極座標からカメラ位置を算出
+    float x = m_camDist * cos(m_camPitch) * sin(m_camYaw);
+    float y = m_camDist * sin(m_camPitch);
+    float z = m_camDist * cos(m_camPitch) * cos(m_camYaw);
 
+    EVec3f eye = m_camPos + EVec3f(x, y, z);
+    EVec3f center = m_camPos;
+    EVec3f up(0, 1, 0);
 
+    EVec3f f = (center - eye).normalized();
+    EVec3f s = f.cross(up).normalized();
+    EVec3f u = s.cross(f);
 
-void EventManager::DrawScene(
-  int screen_width, 
-  int screen_height) 
-{
-  m_ogl.OnDrawBegin(screen_width, screen_height);
-  
+    EMat4f res = EMat4f::Identity();
+    res(0, 0) = s.x(); res(0, 1) = s.y(); res(0, 2) = s.z();
+    res(1, 0) = u.x(); res(1, 1) = u.y(); res(1, 2) = u.z();
+    res(2, 0) = -f.x(); res(2, 1) = -f.y(); res(2, 2) = -f.z();
+    res(0, 3) = -s.dot(eye);
+    res(1, 3) = -u.dot(eye);
+    res(2, 3) = f.dot(eye);
+    return res;
 }
+
+// 透視投影行列の作成
+EMat4f EventManager::GetProjectionMatrix(float w, float h) {
+    float aspect = w / h;
+    float fov = 45.0f * 3.14159265f / 180.0f;
+    float zNear = 0.1f;
+    float zFar = 1000.0f;
+    float tanHalfFov = tan(fov / 2.0f);
+
+    EMat4f res = EMat4f::Zero();
+    res(0, 0) = 1.0f / (aspect * tanHalfFov);
+    res(1, 1) = 1.0f / (tanHalfFov);
+    res(2, 2) = -(zFar + zNear) / (zFar - zNear);
+    res(2, 3) = -(2.0f * zFar * zNear) / (zFar - zNear);
+    res(3, 2) = -1.0f;
+    return res;
+}
+
+void EventManager::DrawScene(int w, int h) {
+    glViewport(0, 0, w, h);
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    EMat4f view = GetViewMatrix();
+    EMat4f proj = GetProjectionMatrix((float)w, (float)h);
+
+    // Rendererへ行列を渡す (Eigenのdata()は列優先なのでそのまま渡せる)
+    m_renderer.Render(m_loader.GetNumSplats(), view.data(), proj.data(), w, h);
+}
+
+// --- マウス操作でのパラメータ更新 ---
+
+void EventManager::MouseMove(EVec2i p) {
+    if (!m_isL && !m_isR && !m_isM) return;
+    float dx = (float)(p.x() - m_prepos.x());
+    float dy = (float)(p.y() - m_prepos.y());
+
+    if (m_isL) { // 回転
+        m_camYaw -= dx * 0.01f;
+        m_camPitch += dy * 0.01f;
+        m_camPitch = std::max(-1.5f, std::min(1.5f, m_camPitch)); // 首振り制限
+    }
+    else if (m_isR) { // 平行移動
+        m_camPos.y() += dy * 0.01f;
+        m_camPos.x() -= dx * 0.01f;
+    }
+    else if (m_isM) { // ズーム
+        m_camDist += dy * 0.1f;
+    }
+    m_prepos = p;
+}
+
+void EventManager::MouseWheel(int dx, int dy) {
+    m_camDist -= (float)dy * 0.5f;
+    if (m_camDist < 0.1f) m_camDist = 0.1f;
+}
+
+// 残りのボタンイベント（前回のものと同じ）
+void EventManager::LBtnDown(EVec2i p, bool c, bool s) { m_isL = true; m_prepos = p; }
+void EventManager::RBtnDown(EVec2i p, bool c, bool s) { m_isR = true; m_prepos = p; }
+void EventManager::MBtnDown(EVec2i p, bool c, bool s) { m_isM = true; m_prepos = p; }
+void EventManager::LBtnUp(EVec2i p, bool c, bool s) { m_isL = false; }
+void EventManager::RBtnUp(EVec2i p, bool c, bool s) { m_isR = false; }
+void EventManager::MBtnUp(EVec2i p, bool c, bool s) { m_isM = false; }
