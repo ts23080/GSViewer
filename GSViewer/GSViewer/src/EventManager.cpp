@@ -205,28 +205,4 @@ void EventManager::DrawScene(
 {
   m_ogl.OnDrawBegin(screen_width, screen_height);
   
-  DrawFrame();
-  
-  glColor3f(1,1,0);
-  glBegin(GL_LINES);
-  for(const auto &p : m_stroke) glVertex3fv(p.data());
-  glEnd();  
-
-  glDisable(GL_LIGHTING);
-  glBegin(GL_TRIANGLES);
-    glColor3f(1.0f, 0.0f, 0.0f); glVertex3f(-5.0f, -5.0f, 0.0f);
-    glColor3f(0.0f, 1.0f, 0.0f); glVertex3f(5.0f, -5.0f, 0.0f);
-    glColor3f(0.0f, 0.0f, 1.0f); glVertex3f(0.0f, 5.0f, 0.0f);
-  glEnd();
-
-  glEnable(GL_LIGHTING);
-  DrawCube();
-
-
-  DrawSphere(EVec3f( 5, 2, 3), 3);
-  DrawSphere(EVec3f( 3, 5, 7), 3);
-  DrawSphere(EVec3f(-1,-3,-3), 8);
-
-  
-  
 }
