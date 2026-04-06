@@ -1,4 +1,4 @@
-# Visual Studio の一時ファイル
+# Visual Studio の一時ファイルとキャッシュ
 .vs/
 [Dd]ebug/
 [Rr]elease/
@@ -8,8 +8,11 @@ x86/
 *.aps
 *.opendb
 *.pdb
+*.vsidx
 
 # ビルド生成物
 *.exe
 *.obj
 *.log
+*.tlog
+*.lastbuildstate
