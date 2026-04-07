@@ -1,18 +1,1 @@
-# Visual Studio の一時ファイルとキャッシュ
-.vs/
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-*.user
-*.aps
-*.opendb
-*.pdb
-*.vsidx
-
-# ビルド生成物
-*.exe
-*.obj
-*.log
-*.tlog
-*.lastbuildstate
+model.ply

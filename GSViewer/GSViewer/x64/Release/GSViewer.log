@@ -1,0 +1,11 @@
+﻿  Renderer.cpp
+C:\Users\tamura\source\repos\ts23080\GSViewer\GSViewer\GSViewer\Renderer.cpp(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\tamura\source\repos\ts23080\GSViewer\GSViewer\GSViewer\Renderer.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+  (ソース ファイル 'Renderer.cpp' をコンパイルしています)
+  
+  コード生成しています。
+  3 of 724 functions ( 0.4%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    15 functions had inline decision re-evaluated but remain unchanged
+  コード生成が終了しました。
+  GSViewer.vcxproj -> C:\Users\tamura\source\repos\ts23080\GSViewer\GSViewer\x64\Release\GSViewer.exe
