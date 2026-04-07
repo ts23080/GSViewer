@@ -6,19 +6,18 @@
 class Loading {
 public:
     struct GaussianSplat {
-        float pos[3];      // 0-2: x, y, z
-        float sh_base[3];  // 3-5: f_dc_0, 1, 2
-        float sh_rest[48]; // 6-53: f_rest_0...47 (色の変化)
-        float opacity;     // 54: 不透明度
-        float scale[3];    // 55-57: スケール
-        float rot[4];      // 58-61: 回転 (Quaternion)
+        float px, py, pz;         // 位置
+        float r, g, b;            // SH基礎 (f_dc)
+        float sh_rest[45];        // SH詳細 (f_rest_0 ～ 44)
+        float opacity;            // 不透明度
+        float sx, sy, sz;         // スケール
+        float rx, ry, rz, rw;     // 回転 (Quaternion)
     };
 
     Loading();
     ~Loading();
 
     bool LoadFromPly(const std::string& filename);
-
     const std::vector<GaussianSplat>& GetSplats() const { return m_splats; }
     int GetNumSplats() const { return static_cast<int>(m_splats.size()); }
 

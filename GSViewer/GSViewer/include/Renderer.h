@@ -1,6 +1,9 @@
 #pragma once
+
 #include <glad/glad.h>
 #include <string>
+#include <vector>
+#include <iostream>
 #include "Loading.h"
 
 class Renderer {
@@ -8,13 +11,20 @@ public:
     Renderer();
     ~Renderer();
 
-    bool Init(const std::string& v, const std::string& g, const std::string& f);
+    // ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®åˆæœŸåŒ–
+    bool Init(const std::string& vPath, const std::string& gPath, const std::string& fPath);
+
+    // ãƒãƒƒãƒ•ã‚¡ã®æ§‹ç¯‰
     void SetupBuffers(const Loading& loader);
 
-    // š‚±‚±‚ªd—vFˆø”‚ğ 5ŒÂ (int, float*, float*, int, int) ‚É’è‹`
-    void Render(int num, float* view, float* proj, int w, int h);
+    // æç”»å®Ÿè¡Œ
+    void Render(int num, const float* view, const float* proj, int w, int h);
 
 private:
-    GLuint m_program, m_ssbo, m_vao;
+    GLuint m_program;
+    GLuint m_vao;
+    GLuint m_vbo;
+
+    // å†…éƒ¨ç”¨ï¼šã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«
     GLuint Compile(GLenum type, const std::string& path);
 };

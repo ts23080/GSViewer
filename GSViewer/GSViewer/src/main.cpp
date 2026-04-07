@@ -82,16 +82,18 @@ int main() {
     glfwSetMouseButtonCallback(w, mouseButtonCallback);
     glfwSetCursorPosCallback(w, cursorPosCallback);
     glfwSetScrollCallback(w, scrollCallback);
-    glfwSetKeyCallback(w, keyCallback);
 
-    // 垂直同期 (1: ON, 0: OFF)
     glfwSwapInterval(1);
+
+    // アルファブレンディングを有効化
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     while (!glfwWindowShouldClose(w)) {
         int fbw, fbh;
         glfwGetFramebufferSize(w, &fbw, &fbh);
 
-        // 描画
+        // 描画実行
         em.DrawScene(fbw, fbh);
 
         glfwSwapBuffers(w);
