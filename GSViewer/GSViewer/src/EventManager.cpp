@@ -46,26 +46,38 @@ EventManager::EventManager()
     }
 }
 
-// ソート処理
 void EventManager::SortSplats() {
     if (m_indices.empty()) return;
 
-    // 現在のカメラ位置を計算
-    float x = m_camDist * cos(m_camPitch) * sin(m_camYaw);
-    float y = m_camDist * sin(m_camPitch);
-    float z = m_camDist * cos(m_camPitch) * cos(m_camYaw);
-    Eigen::Vector3f eye = m_camPos + Eigen::Vector3f(x, y, z);
+    // 1. カメラの「前方ベクトル」を正確に取得
+    // ビュー行列の3行目 (index 2, 6, 10) が視線方向に関連します
+    // またはカメラのYaw/Pitchから計算
+    float x = cos(m_camPitch) * sin(m_camYaw);
+    float y = sin(m_camPitch);
+    float z = cos(m_camPitch) * cos(m_camYaw);
+    Eigen::Vector3f forward(x, y, z);
 
     const auto& splats = m_loader.GetSplats();
 
-    // 距離の遠い順（Back-to-Front）にソート
-    std::sort(m_indices.begin(), m_indices.end(), [&](unsigned int a, unsigned int b) {
-        const auto& s1 = splats[a];
-        const auto& s2 = splats[b];
-        float d1 = (Eigen::Vector3f(s1.px, s1.py, s1.pz) - eye).squaredNorm();
-        float d2 = (Eigen::Vector3f(s2.px, s2.py, s2.pz) - eye).squaredNorm();
-        return d1 > d2;
+    // 2. 各スプラットの「深度」を事前計算してキャッシュすると高速（std::sort内で計算すると重い）
+    std::vector<std::pair<float, unsigned int>> depthIndices(m_indices.size());
+    for (size_t i = 0; i < m_indices.size(); ++i) {
+        unsigned int idx = m_indices[i];
+        const auto& s = splats[idx];
+        // カメラ前方ベクトルへの投影距離
+        float d = forward.x() * s.px + forward.y() * s.py + forward.z() * s.pz;
+        depthIndices[i] = { d, idx };
+    }
+
+    // 3. 遠い順 (降順) にソート
+    std::sort(depthIndices.begin(), depthIndices.end(), [](const auto& a, const auto& b) {
+        return a.first > b.first;
         });
+
+    // 4. インデックス配列を更新
+    for (size_t i = 0; i < m_indices.size(); ++i) {
+        m_indices[i] = depthIndices[i].second;
+    }
 }
 
 void EventManager::DrawScene(int w, int h) {

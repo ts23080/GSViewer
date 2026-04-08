@@ -1,21 +1,22 @@
 #version 460 core
-in vec2 TexCoord;
+in vec2 vTexCoord;
 in vec3 vColor;
 in float vOpacity;
+in vec3 vConic;
 out vec4 FragColor;
 
 void main() {
-    // 中心からの距離の2乗を計算
-    float d = dot(TexCoord, TexCoord);
+    // 2Dガウス分布の計算: exp(-0.5 * (a*x^2 + 2b*xy + c*y^2))
+    float power = -0.5 * (vConic.x * vTexCoord.x * vTexCoord.x + 
+                          2.0 * vConic.y * vTexCoord.x * vTexCoord.y + 
+                          vConic.z * vTexCoord.y * vTexCoord.y);
     
-    // 円の外（距離 > 1.0）を捨てる
-    if (d > 1.0) discard; 
+    if (power > 0.0) discard;
+    float alpha = vOpacity * exp(power);
+    
+    if (alpha < 1.0/255.0) discard;
 
-    // ガウス関数（中心ほど濃く、外側ほど薄く）
-    // -d * 4.0 は、ぼかし具合を調整する定数。4.0～8.0程度が良い
-    float power = exp(-0.5 * d * 6.0); 
-    float alpha = vOpacity * power;
-
-    // アルファブレンディングが効くように、FragColorを書き出す
-    FragColor = vec4(vColor, alpha);
+    // ガンマ補正をして出力
+    vec3 unitColor = clamp(vColor, 0.0, 1.0);
+    FragColor = vec4(unitColor * alpha, alpha); // Premultiplied Alpha
 }
