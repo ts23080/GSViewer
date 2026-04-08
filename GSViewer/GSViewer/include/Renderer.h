@@ -1,30 +1,37 @@
 #pragma once
 
 #include <glad/glad.h>
-#include <string>
 #include <vector>
-#include <iostream>
-#include "Loading.h"
+#include "Loading.h" // GaussianSplat 構造体の定義を使用するため
 
 class Renderer {
 public:
     Renderer();
     ~Renderer();
 
-    // シェーダーの初期化
-    bool Init(const std::string& vPath, const std::string& gPath, const std::string& fPath);
+    /**
+     * @brief 頂点データ(VBO/VAO)の初期化とシェーダープログラムの登録
+     * @param splats Loadingクラスで読み込んだデータのベクター
+     * @param program コンパイル済みのシェーダープログラムID
+     */
+    void Setup(const std::vector<Loading::GaussianSplat>& splats, GLuint program);
 
-    // バッファの構築
-    void SetupBuffers(const Loading& loader);
-
-    // 描画実行
-    void Render(int num, const float* view, const float* proj, int w, int h);
+    /**
+     * @brief 描画実行
+     * @param numSplats 描画するポイントの数
+     * @param view ビュー行列の先頭ポインタ (float[16])
+     * @param proj 投影行列の先頭ポインタ (float[16])
+     * @param screenW 画面幅 (不透明度やサイズの計算用)
+     * @param screenH 画面高さ
+     */
+    void Render(int numSplats, const float* view, const float* proj, int screenW, int screenH);
 
 private:
-    GLuint m_program;
-    GLuint m_vao;
-    GLuint m_vbo;
+    GLuint m_vao;       // Vertex Array Object
+    GLuint m_vbo;       // Vertex Buffer Object
+    GLuint m_program;   // Shader Program ID
 
-    // 内部用：シェーダーコンパイル
-    GLuint Compile(GLenum type, const std::string& path);
+    // コピー禁止（リソース管理のため）
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
 };

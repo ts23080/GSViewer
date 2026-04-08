@@ -1,108 +1,92 @@
 #include "Renderer.h"
-#include <fstream>
-#include <sstream>
+#include "Loading.h"
+#include <iostream>
+#include <vector>
 
-Renderer::Renderer() : m_program(0), m_vao(0), m_vbo(0) {}
+Renderer::Renderer() : m_vao(0), m_vbo(0), m_program(0) {}
 
 Renderer::~Renderer() {
+    if (m_vao) glDeleteVertexArrays(1, &m_vao);
+    if (m_vbo) glDeleteBuffers(1, &m_vbo);
     if (m_program) glDeleteProgram(m_program);
-    if (m_vbo) glDeleteBuffers(1, &m_vbo);
-    if (m_vao) glDeleteVertexArrays(1, &m_vao);
 }
 
-bool Renderer::Init(const std::string& vPath, const std::string& gPath, const std::string& fPath) {
-    GLuint vShader = Compile(GL_VERTEX_SHADER, vPath);
-    GLuint gShader = Compile(GL_GEOMETRY_SHADER, gPath);
-    GLuint fShader = Compile(GL_FRAGMENT_SHADER, fPath);
+void Renderer::Setup(const std::vector<Loading::GaussianSplat>& splats, GLuint program) {
+    m_program = program;
 
-    if (!vShader || !gShader || !fShader) return false;
+    if (splats.empty()) return;
 
-    m_program = glCreateProgram();
-    glAttachShader(m_program, vShader);
-    glAttachShader(m_program, gShader);
-    glAttachShader(m_program, fShader);
-    glLinkProgram(m_program);
-
-    GLint success;
-    glGetProgramiv(m_program, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(m_program, 512, NULL, infoLog);
-        std::cerr << "Shader Link Error:\n" << infoLog << std::endl;
-        return false;
-    }
-
-    glDeleteShader(vShader);
-    glDeleteShader(gShader);
-    glDeleteShader(fShader);
-    return true;
-}
-
-void Renderer::SetupBuffers(const Loading& loader) {
-    if (loader.GetSplats().empty()) return;
-
-    if (m_vao) glDeleteVertexArrays(1, &m_vao);
-    if (m_vbo) glDeleteBuffers(1, &m_vbo);
-
+    // 1. VAOとVBOの生成
     glGenVertexArrays(1, &m_vao);
     glGenBuffers(1, &m_vbo);
 
     glBindVertexArray(m_vao);
     glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-    glBufferData(GL_ARRAY_BUFFER, loader.GetSplats().size() * sizeof(Loading::GaussianSplat), loader.GetSplats().data(), GL_STATIC_DRAW);
 
+    // 2. データの転送
+    glBufferData(GL_ARRAY_BUFFER, splats.size() * sizeof(Loading::GaussianSplat), splats.data(), GL_STATIC_DRAW);
+
+    // 3. 頂点属性の設定 (Vertex Attribute Pointers)
+    // 1頂点の合計サイズ
     GLsizei stride = sizeof(Loading::GaussianSplat);
 
-    // Location 0: Pos, 1: Color, 5: Opacity, 6: Scale, 7: Rot
+    // Location 0: Position (px, py, pz)
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Loading::GaussianSplat, px));
 
+    // Location 1: SH Base Color (r, g, b)
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Loading::GaussianSplat, r));
 
+    // ※ Location 2 (sh_rest[45]) はシェーダーで使わないためスキップ
+
+    // Location 3: Opacity
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Loading::GaussianSplat, opacity));
+
+    // Location 4: Scale (sx, sy, sz)
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Loading::GaussianSplat, sx));
+
+    // Location 5: Rotation (rx, ry, rz, rw)
     glEnableVertexAttribArray(5);
-    glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Loading::GaussianSplat, opacity));
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Loading::GaussianSplat, rx));
 
-    glEnableVertexAttribArray(6);
-    glVertexAttribPointer(6, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Loading::GaussianSplat, sx));
-
-    glEnableVertexAttribArray(7);
-    glVertexAttribPointer(7, 4, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Loading::GaussianSplat, rx));
-
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+
+    std::cout << "Renderer: VAO/VBO Setup complete with " << splats.size() << " splats." << std::endl;
 }
 
-void Renderer::Render(int num, const float* view, const float* proj, int w, int h) {
-    if (num <= 0 || m_program == 0) return;
+void Renderer::Render(int numSplats, const float* view, const float* proj, int screenW, int screenH) {
+    if (numSplats <= 0 || m_vao == 0 || m_program == 0) return;
+
+    // アルファブレンディングの設定 (重要: これがないとガウスの重なりが汚くなります)
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // 3DGSは基本的に順序依存のレンダリングですが、
+    // ソート未実装の場合は一旦デプスをオフにすると重なりが見えるようになります
+    glDisable(GL_DEPTH_TEST);
 
     glUseProgram(m_program);
+
+    // 行列の転送
     glUniformMatrix4fv(glGetUniformLocation(m_program, "view"), 1, GL_FALSE, view);
     glUniformMatrix4fv(glGetUniformLocation(m_program, "projection"), 1, GL_FALSE, proj);
 
-    glBindVertexArray(m_vao);
-    glDrawArrays(GL_POINTS, 0, num);
-    glBindVertexArray(0);
-}
-
-GLuint Renderer::Compile(GLenum type, const std::string& path) {
-    std::ifstream file(path);
-    if (!file.is_open()) return 0;
-    std::stringstream ss;
-    ss << file.rdbuf();
-    std::string srcStr = ss.str();
-    const char* src = srcStr.c_str();
-
-    GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &src, NULL);
-    glCompileShader(shader);
-
-    GLint success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(shader, 512, NULL, infoLog);
-        std::cerr << "Compile Error (" << path << "):\n" << infoLog << std::endl;
-        return 0;
+    // 必要に応じてスクリーンサイズを渡す（シェーダー側にある場合）
+    GLint screenLoc = glGetUniformLocation(m_program, "screenSize");
+    if (screenLoc != -1) {
+        glUniform2f(screenLoc, (float)screenW, (float)screenH);
     }
-    return shader;
+
+    glBindVertexArray(m_vao);
+
+    // Pointsとして描画し、Geometry ShaderでQuadに変換する
+    glDrawArrays(GL_POINTS, 0, numSplats);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+    glDisable(GL_BLEND);
 }

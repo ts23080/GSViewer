@@ -1,0 +1,12 @@
+﻿  EventManager.cpp
+C:\Users\syuno\source\repos\ts23080\GSViewer\GSViewer\GSViewer\src\EventManager.cpp(179,16): warning C4244: '初期化中': 'double' から 'float' への変換です。データが失われる可能性があります。
+C:\Users\syuno\source\repos\ts23080\GSViewer\GSViewer\GSViewer\src\EventManager.cpp(180,16): warning C4244: '初期化中': 'double' から 'float' への変換です。データが失われる可能性があります。
+C:\Users\syuno\source\repos\ts23080\GSViewer\GSViewer\GSViewer\src\EventManager.cpp(181,16): warning C4244: '初期化中': 'double' から 'float' への変換です。データが失われる可能性があります。
+C:\Users\syuno\source\repos\ts23080\GSViewer\GSViewer\GSViewer\src\EventManager.cpp(182,16): warning C4244: '初期化中': 'double' から 'float' への変換です。データが失われる可能性があります。
+  main.cpp
+  oglforglfw.cpp
+  Loading.cpp
+  Renderer.cpp
+  コードを生成中...
+  glad.c
+  GSViewer.vcxproj -> C:\Users\syuno\source\repos\ts23080\GSViewer\GSViewer\x64\Debug\GSViewer.exe
