@@ -1,37 +1,22 @@
 #pragma once
-
 #include <glad/glad.h>
 #include <vector>
-#include "Loading.h" // GaussianSplat 構造体の定義を使用するため
+#include "Loading.h"
 
 class Renderer {
 public:
     Renderer();
     ~Renderer();
 
-    /**
-     * @brief 頂点データ(VBO/VAO)の初期化とシェーダープログラムの登録
-     * @param splats Loadingクラスで読み込んだデータのベクター
-     * @param program コンパイル済みのシェーダープログラムID
-     */
-    void Setup(const std::vector<Loading::GaussianSplat>& splats, GLuint program);
-
-    /**
-     * @brief 描画実行
-     * @param numSplats 描画するポイントの数
-     * @param view ビュー行列の先頭ポインタ (float[16])
-     * @param proj 投影行列の先頭ポインタ (float[16])
-     * @param screenW 画面幅 (不透明度やサイズの計算用)
-     * @param screenH 画面高さ
-     */
-    void Render(int numSplats, const float* view, const float* proj, int screenW, int screenH);
+    void Setup(const std::vector<Splat::GaussianSplat>& splats, GLuint program);
+    void Render(int num, const float* view, const float* proj, int w, int h, const unsigned int* indices);
 
 private:
-    GLuint m_vao;       // Vertex Array Object
-    GLuint m_vbo;       // Vertex Buffer Object
-    GLuint m_program;   // Shader Program ID
+    GLuint m_vao;
+    GLuint m_ssbo;   // 頂点データ全体を保持
+    GLuint m_ebo;    // ソート済みインデックスを保持
+    GLuint m_program;
 
-    // コピー禁止（リソース管理のため）
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 };

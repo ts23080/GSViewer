@@ -3,8 +3,9 @@
 #include <iostream>
 #include <string>
 
-Loading::Loading() {}
-Loading::~Loading() { m_splats.clear(); }
+// Loading::Loading() {} // コンストラクタはヘッダーで定義済みなら不要（二重定義注意）
+// もしヘッダーで定義していない場合は以下を生かしてください
+// Loading::Loading() {}
 
 bool Loading::LoadFromPly(const std::string& filename) {
     // 1. バイナリモードでファイルを開く
@@ -42,26 +43,26 @@ bool Loading::LoadFromPly(const std::string& filename) {
     m_splats.resize(numVertices);
 
     // 4. バイナリデータの読み込み
-    // ヘッダーで定義された GaussianSplat の構造通りに読み込みます
     for (int i = 0; i < numVertices; ++i) {
-        GaussianSplat& s = m_splats[i];
+        // Splat:: 名前空間を明示的に指定
+        Splat::GaussianSplat& s = m_splats[i];
 
-        // 位置 (px, py, pz) : 3 floats
+        // 位置 (px, py, pz)
         file.read(reinterpret_cast<char*>(&s.px), sizeof(float) * 3);
 
-        // SH基礎 (r, g, b) : 3 floats (f_dc_0, 1, 2)
+        // SH基礎 (r, g, b)
         file.read(reinterpret_cast<char*>(&s.r), sizeof(float) * 3);
 
-        // SH詳細 (sh_rest) : 45 floats (f_rest_0 ～ 44)
+        // SH詳細 (sh_rest)
         file.read(reinterpret_cast<char*>(s.sh_rest), sizeof(float) * 45);
 
-        // 不透明度 (opacity) : 1 float
+        // 不透明度 (opacity)
         file.read(reinterpret_cast<char*>(&s.opacity), sizeof(float));
 
-        // スケール (sx, sy, sz) : 3 floats
+        // スケール (sx, sy, sz)
         file.read(reinterpret_cast<char*>(&s.sx), sizeof(float) * 3);
 
-        // 回転 (rx, ry, rz, rw) : 4 floats
+        // 回転 (rx, ry, rz, rw)
         file.read(reinterpret_cast<char*>(&s.rx), sizeof(float) * 4);
 
         // 読み込みエラーチェック
@@ -73,7 +74,7 @@ bool Loading::LoadFromPly(const std::string& filename) {
 
     std::cout << "Loading: Successfully loaded " << numVertices << " Gaussian Splats." << std::endl;
 
-    // デバッグ確認用（最初の1点の座標を表示）
+    // デバッグ確認
     if (numVertices > 0) {
         std::cout << "Debug Point[0] Pos: (" << m_splats[0].px << ", "
             << m_splats[0].py << ", " << m_splats[0].pz << ")" << std::endl;

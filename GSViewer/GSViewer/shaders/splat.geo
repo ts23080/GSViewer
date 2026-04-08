@@ -16,7 +16,6 @@ out vec2 TexCoord;
 out vec3 vColor;
 out float vOpacity;
 
-// クォータニオンを回転行列に変換
 mat3 quatToMat3(vec4 q) {
     float r = q.w; float x = q.x; float y = q.y; float z = q.z;
     return mat3(
@@ -27,27 +26,37 @@ mat3 quatToMat3(vec4 q) {
 }
 
 void main() {
-    // 1. スケールと回転の適用
-    // 3DGSのスケールは通常 exp 空間にあるので exp() を通す
+    // 1. まずカメラ空間（View空間）での中心座標を計算
+    vec4 viewCenter = view * gl_in[0].gl_Position;
+
+    // --- 【超重要】カリング：カメラの背後にある点は処理しない ---
+    // これがないと、カメラの後ろにある点が画面中央に向かって線を引きまくります
+    if (viewCenter.z > -0.1) return; 
+
+    // 2. スケールと回転を適用した変換行列 M
     vec3 scale = exp(gs_in[0].scale);
     mat3 R = quatToMat3(normalize(gs_in[0].rot));
-    mat3 S = mat3(scale.x, 0, 0, 0, scale.y, 0, 0, 0, scale.z);
-    mat3 M = R * S;
+    
+    // 3. ビルボードのサイズ調整（定数倍して見やすくします）
+    // 3DGSでは Sigma (共分散) を計算しますが、まずは簡易的に 2.0 倍程度の広がりを持たせます
+    float size = 2.0; 
 
     vColor = gs_in[0].color;
-    // 不透明度も通常 sigmoid 空間にある
     vOpacity = 1.0 / (1.0 + exp(-gs_in[0].opacity));
 
-    // 2. ビルボード（カメラの方向を向く板）の作成
     for (int i = 0; i < 4; i++) {
+        // offset は -1.0 ～ 1.0
         vec2 offset = vec2((i % 2) * 2.0 - 1.0, (i / 2) * 2.0 - 1.0);
         
-        // 四隅の頂点を計算
-        vec3 quadPos = M * vec3(offset, 0.0);
+        // 4. 回転・スケールを適用したオフセットを計算
+        // ここで R * (scale * offset) の形にするのが正解です
+        vec3 localPos = R * (scale * vec3(offset * size, 0.0));
         
-        // 座標変換 (View空間で足し合わせることでビルボード化)
-        vec4 viewPos = view * gl_in[0].gl_Position + vec4(quadPos, 0.0);
-        gl_Position = projection * viewPos;
+        // 5. View空間で中心座標に足し合わせる
+        vec4 pos = viewCenter + vec4(localPos, 0.0);
+        
+        // 6. 最後に投影
+        gl_Position = projection * pos;
         
         TexCoord = offset;
         EmitVertex();
