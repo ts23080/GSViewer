@@ -49,32 +49,43 @@ EventManager::EventManager()
 void EventManager::SortSplats() {
     if (m_indices.empty()) return;
 
-    // 1. カメラの「前方ベクトル」を正確に取得
-    // ビュー行列の3行目 (index 2, 6, 10) が視線方向に関連します
-    // またはカメラのYaw/Pitchから計算
+    // 1. カメラの視線方向（Forward）を計算
+    // ※右手座標系の場合、カメラの正面は通常 -Z 方向ですが、
+    // ここでは「カメラが見ている方向」を正として計算します。
     float x = cos(m_camPitch) * sin(m_camYaw);
     float y = sin(m_camPitch);
     float z = cos(m_camPitch) * cos(m_camYaw);
     Eigen::Vector3f forward(x, y, z);
 
+    // 2. カメラの「実際の位置」を取得
+    // ※もし m_camPos が注視点（ターゲット）なら、実際のカメラ位置を計算する必要があります。
+    // ここでは m_camPos がカメラ自体の座標であると仮定します。
+    Eigen::Vector3f camPos = m_camPos;
+
     const auto& splats = m_loader.GetSplats();
 
-    // 2. 各スプラットの「深度」を事前計算してキャッシュすると高速（std::sort内で計算すると重い）
+    // 3. 深度の事前計算
     std::vector<std::pair<float, unsigned int>> depthIndices(m_indices.size());
     for (size_t i = 0; i < m_indices.size(); ++i) {
         unsigned int idx = m_indices[i];
         const auto& s = splats[idx];
-        // カメラ前方ベクトルへの投影距離
-        float d = forward.x() * s.px + forward.y() * s.py + forward.z() * s.pz;
+
+        // 【重要】カメラ位置からの相対ベクトルを計算
+        Eigen::Vector3f relPos(s.px - camPos.x(), s.py - camPos.y(), s.pz - camPos.z());
+
+        // 視線方向への投影（これが本当の Z-depth）
+        float d = relPos.dot(forward);
+
         depthIndices[i] = { d, idx };
     }
 
-    // 3. 遠い順 (降順) にソート
+    // 4. 遠い順 (降順) にソート
+    // 数値が大きい（＝より前方に遠い）ものから先に描画する
     std::sort(depthIndices.begin(), depthIndices.end(), [](const auto& a, const auto& b) {
-        return a.first > b.first;
+        return a.first < b.first; // 昇順にしてみる
         });
 
-    // 4. インデックス配列を更新
+    // 5. インデックス更新
     for (size_t i = 0; i < m_indices.size(); ++i) {
         m_indices[i] = depthIndices[i].second;
     }

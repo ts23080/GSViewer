@@ -34,7 +34,9 @@ void main() {
     const float SH_C0 = 0.28209479177387814;
     vs_out.color = vec3(s.r, s.g, s.b) * SH_C0 + 0.5;
     
-    vs_out.opacity = 1.0 / (1.0 + exp(-s.opacity)); // シグモイド
+    float k = 1.0;      // 傾き（コントラスト）
+    float b = 1.0;      // バイアス（全体的な濃さ）
+    vs_out.opacity = 1.0 / (1.0 + exp(-(k * s.opacity + b)));
     vs_out.scale   = exp(vec3(s.sx, s.sy, s.sz));    // 指数関数
     vs_out.rot     = normalize(vec4(s.rx, s.ry, s.rz, s.rw));
 }

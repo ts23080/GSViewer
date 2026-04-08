@@ -40,11 +40,10 @@ void Renderer::Setup(const std::vector<Splat::GaussianSplat>& splats, GLuint pro
 void Renderer::Render(int num, const float* view, const float* proj, int w, int h, const unsigned int* indices) {
     if (num <= 0 || !indices || m_program == 0) return;
 
-    // --- 1. ブレンド設定の最適化 ---
+    glDisable(GL_DEPTH_TEST); // 完全にオフ
+    glDepthMask(GL_FALSE);    // 書き込みもオフ
     glEnable(GL_BLEND);
-    // 3DGS公式に近い Premultiplied Alpha 設定
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_DEPTH_TEST);
 
     glUseProgram(m_program);
 
