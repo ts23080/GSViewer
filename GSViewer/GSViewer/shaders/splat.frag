@@ -5,8 +5,17 @@ in float vOpacity;
 out vec4 FragColor;
 
 void main() {
+    // 中心からの距離の2乗を計算
     float d = dot(TexCoord, TexCoord);
-    if (d > 1.0) discard; // 円の外を捨てる
-    float alpha = vOpacity * exp(-d * 4.0); // 中心ほど濃く、外側ほど薄く
+    
+    // 円の外（距離 > 1.0）を捨てる
+    if (d > 1.0) discard; 
+
+    // ガウス関数（中心ほど濃く、外側ほど薄く）
+    // -d * 4.0 は、ぼかし具合を調整する定数。4.0～8.0程度が良い
+    float power = exp(-0.5 * d * 6.0); 
+    float alpha = vOpacity * power;
+
+    // アルファブレンディングが効くように、FragColorを書き出す
     FragColor = vec4(vColor, alpha);
 }

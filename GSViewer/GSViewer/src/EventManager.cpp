@@ -91,7 +91,7 @@ EMat4f EventManager::GetViewMatrix() {
     float z = m_camDist * cos(m_camPitch) * cos(m_camYaw);
     EVec3f eye = m_camPos + EVec3f(x, y, z);
     EVec3f center = m_camPos;
-    EVec3f up(0, 1, 0); // upベクトルを 1 に修正（反転を防ぐ）
+    EVec3f up(0, -1, 0);
 
     EVec3f f = (center - eye).normalized();
     EVec3f s = f.cross(up).normalized();
