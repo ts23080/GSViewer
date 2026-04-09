@@ -10,87 +10,80 @@ struct GaussianSplat {
 };
 
 layout(std430, binding = 0) readonly buffer SplatData { GaussianSplat splats[]; };
-// Renderer側で binding = 1 にソート済みインデックスを渡す必要があります
 layout(std430, binding = 1) readonly buffer SortData { uint sortedIndices[]; };
 
 uniform mat4 view;
 uniform mat4 projection;
 uniform vec2 screenSize;
-uniform float focalLength; // レンズの焦点距離（通常 w / (2 * tan(fov/2))）
 
 out vec2 vTexCoord;
 out vec3 vColor;
 out vec4 vConic;
 
 void main() {
-    // 1. ソート済みインデックスに基づきデータを取得
     uint splatIdx = sortedIndices[gl_InstanceID];
     GaussianSplat s = splats[splatIdx];
 
-    // 2. カメラ空間の位置計算
-    vec4 camPos = view * vec4(s.px, s.py, s.pz, 1.0);
+    // 1. 位置計算
+    vec4 worldPos = vec4(s.px, s.py, s.pz, 1.0);
+    vec4 camPos = view * worldPos;
     float pz = camPos.z;
     
-    // ニアクリップより後ろなら描画しない（画面外へ飛ばす）
     if (pz > -0.1) {
-        gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
+        gl_Position = vec4(0.0);
         return;
     }
 
-// --- 3. 3D共分散行列の構築 ---
-    float quat_x = s.rx; float quat_y = s.ry; float quat_z = s.rz; float quat_w = s.rw;
-    
-    // 回転行列の計算（変数を quat_ にして衝突を回避）
+    // 2. 3D共分散
+    float qx = s.rx; float qy = s.ry; float qz = s.rz; float qw = s.rw;
     mat3 R = mat3(
-        1.0 - 2.0 * (quat_y * quat_y + quat_z * quat_z), 2.0 * (quat_x * quat_y - quat_w * quat_z), 2.0 * (quat_x * quat_z + quat_w * quat_y),
-        2.0 * (quat_x * quat_y + quat_w * quat_z), 1.0 - 2.0 * (quat_x * quat_x + quat_z * quat_z), 2.0 * (quat_y * quat_z - quat_w * quat_x),
-        2.0 * (quat_x * quat_z - quat_w * quat_y), 2.0 * (quat_y * quat_z + quat_w * quat_x), 1.0 - 2.0 * (quat_x * quat_x + quat_y * quat_y)
+        1.0 - 2.0 * (qy * qy + qz * qz), 2.0 * (qx * qy - qw * qz), 2.0 * (qx * qz + qw * qy),
+        2.0 * (qx * qy + qw * qz), 1.0 - 2.0 * (qx * qx + qz * qz), 2.0 * (qy * qz - qw * qx),
+        2.0 * (qx * qz - qw * qy), 2.0 * (qy * qz + qw * qx), 1.0 - 2.0 * (qx * qx + qy * qy)
     );
-    
     mat3 S = mat3(0.0);
     vec3 scale = exp(vec3(s.sx, s.sy, s.sz));
     S[0][0] = scale.x; S[1][1] = scale.y; S[2][2] = scale.z;
-    
-    mat3 M = R * S;
-    mat3 cov3D = M * transpose(M);
+    mat3 cov3D = R * S * transpose(S) * transpose(R);
 
-    // --- 4. 2D投影 (EWA Approximation) ---
-    float f = screenSize.y * 1.2; // 焦点距離
-    mat3 J = mat3(
-        f/pz, 0.0, -(f * camPos.x) / (pz * pz),
-        0.0, f/pz, -(f * camPos.y) / (pz * pz),
-        0.0, 0.0, 0.0
-    );
+    // 3. 2D投影 (EWA)
+    float f = screenSize.y * 1.2;
+    mat3 J = mat3(f/pz, 0.0, -(f*camPos.x)/(pz*pz), 0.0, f/pz, -(f*camPos.y)/(pz*pz), 0.0, 0.0, 0.0);
     mat3 W = mat3(view);
     mat3 T = W * J;
-    
-    // エラーC7011の修正：mat3の結果から左上のmat2部分だけを明示的に取り出す
     mat3 cov2D_temp = transpose(T) * cov3D * T;
-    mat2 cov2D = mat2(cov2D_temp[0].xy, cov2D_temp[1].xy);
-    
-    // Low-pass filter (トゲの鋭さを維持するため 0.1)
-    cov2D[0][0] += 0.1;
-    cov2D[1][1] += 0.1;
+    mat2 cov2D = mat2(cov2D_temp[0].xy, cov2D_temp[1].xy) + mat2(0.1, 0.0, 0.0, 0.1);
 
-    // 5. 逆行列 (Conic) の計算
+    // 4. 逆行列・半径
     float det = cov2D[0][0] * cov2D[1][1] - cov2D[0][1] * cov2D[0][1];
     vec3 conic = vec3(cov2D[1][1], -cov2D[0][1], cov2D[0][0]) / det;
-
-    // 6. Quad頂点の生成 (Triangle Strip 用)
-    // gl_VertexID 0:(-1,-1), 1:(1,-1), 2:(-1,1), 3:(1,1)
-    vec2 offset = vec2(float(gl_VertexID % 2 == 1), float(gl_VertexID >= 2)) * 2.0 - 1.0;
-    
-    // 固有値から描画半径を決定
     float mid = 0.5 * (cov2D[0][0] + cov2D[1][1]);
     float lambda = mid + sqrt(max(0.1, mid * mid - det));
-    float radius = ceil(3.0 * sqrt(lambda)); // 3σ
+    float radius = ceil(3.0 * sqrt(lambda));
 
-    vTexCoord = offset * radius;
-    vColor = max(vec3(0.0), 0.5 + (0.282094 * vec3(s.r, s.g, s.b)));
-    vConic = vec4(conic, 1.0 / (1.0 + exp(-(s.opacity + 3.0)))); // opacityブースト込
+    // --- 5. 写実性を高める SH (球面調和関数) の修正計算 ---
+    // ビュー行列の逆行列からカメラのワールド座標を取得
+    mat4 invView = inverse(view);
+    vec3 camPosWorld = invView[3].xyz;
+    vec3 dir = normalize(vec3(s.px, s.py, s.pz) - camPosWorld);
+    
+    const float SH_C0 = 0.28209479;
+    const float SH_C1 = 0.4886025;
+    vec3 base_color = 0.5 + (SH_C0 * vec3(s.r, s.g, s.b));
+    
+    // SH係数(sh_rest)から方向に応じた色変化を計算 (型変換エラー修正済み)
+    vec3 sh_color = SH_C1 * (
+        vec3(s.sh_rest[0], s.sh_rest[3], s.sh_rest[6]) * dir.x +
+        vec3(s.sh_rest[1], s.sh_rest[4], s.sh_rest[7]) * dir.y +
+        vec3(s.sh_rest[2], s.sh_rest[5], s.sh_rest[8]) * dir.z
+    );
+    
+    vColor = max(vec3(0.0), base_color + sh_color);
+    vTexCoord = (vec2(float(gl_VertexID % 2 == 1), float(gl_VertexID >= 2)) * 2.0 - 1.0) * radius;
+    vConic = vec4(conic, 1.0 / (1.0 + exp(-(s.opacity))));
 
-    // スクリーン空間へ投影
+    // 6. 投影
     vec4 clipPos = projection * camPos;
-    clipPos.xy += offset * radius * (2.0 / screenSize) * clipPos.w;
+    clipPos.xy += (vTexCoord / radius) * radius * (2.0 / screenSize) * clipPos.w;
     gl_Position = clipPos;
 }

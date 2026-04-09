@@ -13,8 +13,8 @@ public:
 
 private:
     GLuint m_vao;
-    GLuint m_ssbo;   // 頂点データ全体を保持
-    GLuint m_ebo;    // ソート済みインデックスを保持
+    GLuint m_ssbo;
+    GLuint m_ebo;    
     GLuint m_program;
 
     Renderer(const Renderer&) = delete;

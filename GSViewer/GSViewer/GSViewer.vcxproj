@@ -145,6 +145,10 @@
   <ItemGroup>
     <Text Include=".gitignore" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\splat.frag" />
+    <None Include="shaders\splat.vert" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
