@@ -6,7 +6,6 @@
 #include <fstream>
 #include <sstream>
 
-// --- シェーダーコンパイル用ヘルパー（実装はファイル下部） ---
 static GLuint CompileShader(GLenum type, const char* path);
 GLuint CreateProgram(const char* vPath,  const char* fPath);
 
@@ -25,7 +24,6 @@ EventManager::EventManager()
         if (prog != 0) {
             m_renderer.Setup(m_loader.GetSplats(), prog);
 
-            // インデックス配列の初期化
             m_indices.resize(m_loader.GetNumSplats());
             std::iota(m_indices.begin(), m_indices.end(), 0);
             std::cout << "EventManager: Initialization Complete." << std::endl;

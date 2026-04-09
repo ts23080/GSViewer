@@ -59,8 +59,15 @@ bool Loading::LoadFromPly(const std::string& filename) {
         // スケール (sx, sy, sz)
         file.read(reinterpret_cast<char*>(&s.sx), sizeof(float) * 3);
 
-        // 回転 (rx, ry, rz, rw)
-        file.read(reinterpret_cast<char*>(&s.rz), sizeof(float) * 4);
+        // 6. 回転 (w, x, y, z で読み込み、構造体の適切なメンバへ格納)
+        float q[4]; // q[0]=w, q[1]=x, q[2]=y, q[3]=z
+        file.read(reinterpret_cast<char*>(q), sizeof(float) * 4);
+
+        // 構造体のメンバ名(rx,ry,rz,rw)に合わせて意味を固定
+        s.rw = q[0]; // w成分
+        s.rx = q[1]; // x成分
+        s.ry = q[2]; // y成分
+        s.rz = q[3]; // z成分
 
         // 読み込みエラーチェック
         if (file.fail()) {
