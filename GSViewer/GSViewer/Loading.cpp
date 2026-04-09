@@ -21,9 +21,6 @@ bool Loading::LoadFromPly(const std::string& filename) {
 
     // 2. ヘッダー解析 (頂点数 element vertex を取得)
     while (std::getline(file, line)) {
-        // Windowsの改行コード \r を除去
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-
         if (line.find("element vertex") != std::string::npos) {
             numVertices = std::stoi(line.substr(line.find_last_of(' ') + 1));
         }

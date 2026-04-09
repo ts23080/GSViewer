@@ -16,12 +16,10 @@ EventManager& EventManager::getInst() {
     return instance;
 }
 
-// コンストラクタ
 EventManager::EventManager()
     : m_isL(false), m_isR(false), m_isM(false),
     m_camPos(0, 0, 0), m_camYaw(0), m_camPitch(0), m_camDist(10.0f)
 {
-    // GLADロード後に main.cpp から getInst() が呼ばれることでここが実行される
     if (m_loader.LoadFromPly("model.ply")) {
         GLuint prog = CreateProgram("shaders/splat.vert", "shaders/splat.geo", "shaders/splat.frag");
         if (prog != 0) {
@@ -33,59 +31,44 @@ EventManager::EventManager()
             std::cout << "EventManager: Initialization Complete." << std::endl;
         }
     }
-
-    if (m_loader.GetNumSplats() > 0) {
-        const auto& s = m_loader.GetSplats()[0]; // 最初の1点を確認
-        std::cout << "\n--- PLY Data Check ---" << std::endl;
-        std::cout << "Position: " << s.px << ", " << s.py << ", " << s.pz << std::endl;
-        std::cout << "Color(RGB): " << s.r << ", " << s.g << ", " << s.b << std::endl;
-        std::cout << "Opacity(Raw): " << s.opacity << std::endl;
-        std::cout << "Scale(Raw): " << s.sx << ", " << s.sy << ", " << s.sz << std::endl;
-        std::cout << "Rotation(Raw): " << s.rx << ", " << s.ry << ", " << s.rz << ", " << s.rw << std::endl;
-        std::cout << "----------------------\n" << std::endl;
-    }
 }
 
 void EventManager::SortSplats() {
     if (m_indices.empty()) return;
 
-    // 1. カメラの視線方向（Forward）を計算
-    // ※右手座標系の場合、カメラの正面は通常 -Z 方向ですが、
-    // ここでは「カメラが見ている方向」を正として計算します。
-    float x = cos(m_camPitch) * sin(m_camYaw);
-    float y = sin(m_camPitch);
-    float z = cos(m_camPitch) * cos(m_camYaw);
-    Eigen::Vector3f forward(x, y, z);
+    // --- 1. カメラの forward ベクトルを正しく計算 ---
+    Eigen::Vector3f forward;
+    forward.x() = cos(m_camPitch) * sin(m_camYaw);
+    forward.y() = sin(m_camPitch);
+    forward.z() = cos(m_camPitch) * cos(m_camYaw);
+    forward.normalize();
 
-    // 2. カメラの「実際の位置」を取得
-    // ※もし m_camPos が注視点（ターゲット）なら、実際のカメラ位置を計算する必要があります。
-    // ここでは m_camPos がカメラ自体の座標であると仮定します。
     Eigen::Vector3f camPos = m_camPos;
-
     const auto& splats = m_loader.GetSplats();
 
-    // 3. 深度の事前計算
+    // --- 2. depth の事前計算 ---
     std::vector<std::pair<float, unsigned int>> depthIndices(m_indices.size());
+
     for (size_t i = 0; i < m_indices.size(); ++i) {
         unsigned int idx = m_indices[i];
         const auto& s = splats[idx];
 
-        // 【重要】カメラ位置からの相対ベクトルを計算
         Eigen::Vector3f relPos(s.px - camPos.x(), s.py - camPos.y(), s.pz - camPos.z());
 
-        // 視線方向への投影（これが本当の Z-depth）
+        // forward 方向への投影（前方が正）
         float d = relPos.dot(forward);
 
         depthIndices[i] = { d, idx };
     }
 
-    // 4. 遠い順 (降順) にソート
-    // 数値が大きい（＝より前方に遠い）ものから先に描画する
-    std::sort(depthIndices.begin(), depthIndices.end(), [](const auto& a, const auto& b) {
-        return a.first < b.first; // 昇順にしてみる
-        });
+    // --- 3. 遠い順（降順）にソート ---
+    std::sort(depthIndices.begin(), depthIndices.end(),
+        [](const auto& a, const auto& b) {
+            return a.first > b.first;  // 遠い → 近い
+        }
+    );
 
-    // 5. インデックス更新
+    // --- 4. インデックス更新 ---
     for (size_t i = 0; i < m_indices.size(); ++i) {
         m_indices[i] = depthIndices[i].second;
     }
@@ -105,8 +88,6 @@ void EventManager::DrawScene(int w, int h) {
     // 2. ソート済みインデックス配列(m_indices.data())を渡してレンダリング
     m_renderer.Render(m_loader.GetNumSplats(), view.data(), proj.data(), w, h, m_indices.data());
 }
-
-// --- 以下、行列・マウス・シェーダー実装（変更なし/整理） ---
 
 EMat4f EventManager::GetViewMatrix() {
     float x = m_camDist * cos(m_camPitch) * sin(m_camYaw);

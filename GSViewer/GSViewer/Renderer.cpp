@@ -43,7 +43,7 @@ void Renderer::Render(int num, const float* view, const float* proj, int w, int 
     glDisable(GL_DEPTH_TEST); // 完全にオフ
     glDepthMask(GL_FALSE);    // 書き込みもオフ
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glUseProgram(m_program);
 

@@ -1,11 +1,12 @@
 #version 460 core
+precision highp float;
+
 in vec2 vTexCoord;
 in vec3 vColor;
-in float vOpacity;
-in vec3 vConic;
+in vec4 vConic; // GS側と型を一致させる
 out vec4 FragColor;
 
-// ACESトーンマッピング近似関数（写真のような階調を作る）
+// ACESトーンマッピング：実写に近い階調表現
 vec3 ACESFilm(vec3 x) {
     float a = 2.51;
     float b = 0.03;
@@ -16,35 +17,34 @@ vec3 ACESFilm(vec3 x) {
 }
 
 void main() {
+    // 公式ベースの正確なパワー計算
     float power = -0.5 * (vConic.x * vTexCoord.x * vTexCoord.x + 
-                          2.0 * vConic.y * vTexCoord.x * vTexCoord.y + 
-                          vConic.z * vTexCoord.y * vTexCoord.y);
+                          vConic.z * vTexCoord.y * vTexCoord.y) 
+                          - vConic.y * vTexCoord.x * vTexCoord.y;
     
     if (power > 0.0) discard;
 
-    // ガウスの広がり（0.8〜0.9が密度とクッキリ感のバランスが良い）
-    float G = exp(power * 0.9);
-    float alpha = clamp(vOpacity * G, 0.0, 0.99);
+    // vConic.w から不透明度を取得
+    float alpha = vConic.w * exp(power);
+    
     if (alpha < 0.04) discard; 
+    alpha = min(0.99, alpha);
 
-    // --- 【色彩設計】 ---
+    // --- 色の調整：暗く、鮮やかに ---
     vec3 color = vColor;
-
-    // 1. 彩度を「さらに」強化 (1.5倍)
+    
+    // 1. 彩度を少し強調
     float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
     color = mix(vec3(luma), color, 1.5);
 
-    // 2. ACESトーンマッピング適用
-    // これにより、色が深く、実写映画のような質感になります
-    color = ACESFilm(color * 0.5); // 0.5は露出補正（明るさの微調整）
+    // 2. 【核心】露出を大幅に下げて実写に近づける
+    // 0.6 〜 0.7 程度にすると「白っぽさ」が抜けて重厚感が出ます
+    color *= 0.5; 
 
-    // 3. ガンマ補正 (sRGB)
+    // 3. トーンマッピングとガンマ補正
+    color = ACESFilm(color);
     vec3 sRGB = pow(color, vec3(1.0 / 2.2));
 
-    // 4. コントラスト補正
-    // わずかにコントラストを上げ、中間色をパキッとさせます
-    sRGB = mix(sRGB, sRGB * sRGB * (3.0 - 2.0 * sRGB), 0.5);
-
-    // Premultiplied Alpha 出力
-    FragColor = vec4(sRGB * alpha, alpha);
+    // 4. 合成用出力 (Premultiplied Alpha)
+    FragColor = vec4(sRGB, alpha);
 }

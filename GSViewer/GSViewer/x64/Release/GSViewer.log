@@ -1,9 +1,8 @@
 ﻿  EventManager.cpp
-C:\Users\syuno\source\repos\ts23080\GSViewer\GSViewer\GSViewer\include\Renderer.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'src/EventManager.cpp' をコンパイルしています)
-  
+  main.cpp
+  oglforglfw.cpp
   コード生成しています。
   Previous IPDB and IOBJ mismatch, fall back to full compilation.
-  All 863 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 878 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   コード生成が終了しました。
   GSViewer.vcxproj -> C:\Users\syuno\source\repos\ts23080\GSViewer\GSViewer\x64\Release\GSViewer.exe

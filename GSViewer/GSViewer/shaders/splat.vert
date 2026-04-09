@@ -25,18 +25,28 @@ out VS_OUT {
 
 void main() {
     GaussianSplat s = splats[gl_VertexID];
-    vec4 worldPos = vec4(s.px, s.py, s.pz, 1.0);
-    
-    vs_out.viewPos = view * worldPos;
-    gl_Position = worldPos; // ジオメトリシェーダーに渡す
 
-    // SH 0次の計算（公式の係数 0.28209...）
+    // --- 1. カメラ空間に変換 ---
+    vec4 worldPos = vec4(s.px, s.py, s.pz, 1.0);
+    vec4 camPos   = view * worldPos;
+
+    // ジオメトリシェーダーで使うのは viewPos のみ
+    vs_out.viewPos = camPos;
+
+    // gl_Position は "点" として扱うので camPos を渡す
+    gl_Position = camPos;
+
+    // --- 2. SH0 の色計算 ---
     const float SH_C0 = 0.28209479177387814;
     vs_out.color = vec3(s.r, s.g, s.b) * SH_C0 + 0.5;
-    
-    float k = 1.0;      // 傾き（コントラスト）
-    float b = 1.0;      // バイアス（全体的な濃さ）
-    vs_out.opacity = 1.0 / (1.0 + exp(-(k * s.opacity + b)));
-    vs_out.scale   = exp(vec3(s.sx, s.sy, s.sz));    // 指数関数
-    vs_out.rot     = normalize(vec4(s.rx, s.ry, s.rz, s.rw));
+
+    // --- 3. 不透明度の補正 ---
+    float k = 1.0;
+    float b = 0.5;
+    float rawOpacity = 1.0 / (1.0 + exp(-(k * s.opacity + b)));
+    vs_out.opacity = sqrt(rawOpacity);
+
+    // --- 4. スケールと回転（そのまま） ---
+    vs_out.scale = exp(vec3(s.sx, s.sy, s.sz));
+    vs_out.rot   = normalize(vec4(s.rx, s.ry, s.rz, s.rw));
 }
