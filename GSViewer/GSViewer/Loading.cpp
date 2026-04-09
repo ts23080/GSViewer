@@ -60,7 +60,7 @@ bool Loading::LoadFromPly(const std::string& filename) {
         file.read(reinterpret_cast<char*>(&s.sx), sizeof(float) * 3);
 
         // 回転 (rx, ry, rz, rw)
-        file.read(reinterpret_cast<char*>(&s.rx), sizeof(float) * 4);
+        file.read(reinterpret_cast<char*>(&s.rz), sizeof(float) * 4);
 
         // 読み込みエラーチェック
         if (file.fail()) {

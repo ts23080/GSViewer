@@ -3,7 +3,7 @@
 struct GaussianSplat {
     float px, py, pz;
     float r, g, b;
-    float sh_rest[45];
+    float sh_rest[45]; // 構造体の定義はバッファのオフセット維持のため残す
     float opacity;
     float sx, sy, sz;
     float rx, ry, rz, rw;
@@ -34,24 +34,25 @@ void main() {
         return;
     }
 
-    // 2. 3D共分散
-    float qx = s.rx; float qy = s.ry; float qz = s.rz; float qw = s.rw;
+    // 2. 3D共分散 (回転とスケール)
+    vec4 q = normalize(vec4(s.rw, s.rx, s.ry, s.rz));
     mat3 R = mat3(
-        1.0 - 2.0 * (qy * qy + qz * qz), 2.0 * (qx * qy - qw * qz), 2.0 * (qx * qz + qw * qy),
-        2.0 * (qx * qy + qw * qz), 1.0 - 2.0 * (qx * qx + qz * qz), 2.0 * (qy * qz - qw * qx),
-        2.0 * (qx * qz - qw * qy), 2.0 * (qy * qz + qw * qx), 1.0 - 2.0 * (qx * qx + qy * qy)
+        1.0 - 2.0 * (q.y * q.y + q.z * q.z), 2.0 * (q.x * q.y - q.w * q.z), 2.0 * (q.x * q.z + q.w * q.y),
+        2.0 * (q.x * q.y + q.w * q.z), 1.0 - 2.0 * (q.x * q.x + q.z * q.z), 2.0 * (q.y * q.z - q.w * q.x),
+        2.0 * (q.x * q.z - q.w * q.y), 2.0 * (q.y * q.z + q.w * q.x), 1.0 - 2.0 * (q.x * q.x + q.y * q.y)
     );
     mat3 S = mat3(0.0);
     vec3 scale = exp(vec3(s.sx, s.sy, s.sz));
     S[0][0] = scale.x; S[1][1] = scale.y; S[2][2] = scale.z;
-    mat3 cov3D = R * S * transpose(S) * transpose(R);
+    mat3 M = R * S;
+    mat3 cov3D = M * transpose(M);
 
     // 3. 2D投影 (EWA)
     float f = screenSize.y * 1.2;
     mat3 J = mat3(f/pz, 0.0, -(f*camPos.x)/(pz*pz), 0.0, f/pz, -(f*camPos.y)/(pz*pz), 0.0, 0.0, 0.0);
     mat3 W = mat3(view);
-    mat3 T = W * J;
-    mat3 cov2D_temp = transpose(T) * cov3D * T;
+    mat3 T = J * W;
+    mat3 cov2D_temp = T * cov3D * transpose(T);
     mat2 cov2D = mat2(cov2D_temp[0].xy, cov2D_temp[1].xy) + mat2(0.1, 0.0, 0.0, 0.1);
 
     // 4. 逆行列・半径
@@ -61,24 +62,11 @@ void main() {
     float lambda = mid + sqrt(max(0.1, mid * mid - det));
     float radius = ceil(3.0 * sqrt(lambda));
 
-    // --- 5. 写実性を高める SH (球面調和関数) の修正計算 ---
-    // ビュー行列の逆行列からカメラのワールド座標を取得
-    mat4 invView = inverse(view);
-    vec3 camPosWorld = invView[3].xyz;
-    vec3 dir = normalize(vec3(s.px, s.py, s.pz) - camPosWorld);
-    
+    // --- 5. 色の決定 (SHを使わないシンプルな形) ---
+    // SH_C0 定数を用いて基本色を復元（通常、学習済みデータのDC成分はSH_C0で除算されているため）
     const float SH_C0 = 0.28209479;
-    const float SH_C1 = 0.4886025;
-    vec3 base_color = 0.5 + (SH_C0 * vec3(s.r, s.g, s.b));
+    vColor = max(vec3(0.0), 0.5 + (SH_C0 * vec3(s.r, s.g, s.b)));
     
-    // SH係数(sh_rest)から方向に応じた色変化を計算 (型変換エラー修正済み)
-    vec3 sh_color = SH_C1 * (
-        vec3(s.sh_rest[0], s.sh_rest[3], s.sh_rest[6]) * dir.x +
-        vec3(s.sh_rest[1], s.sh_rest[4], s.sh_rest[7]) * dir.y +
-        vec3(s.sh_rest[2], s.sh_rest[5], s.sh_rest[8]) * dir.z
-    );
-    
-    vColor = max(vec3(0.0), base_color + sh_color);
     vTexCoord = (vec2(float(gl_VertexID % 2 == 1), float(gl_VertexID >= 2)) * 2.0 - 1.0) * radius;
     vConic = vec4(conic, 1.0 / (1.0 + exp(-(s.opacity))));
 

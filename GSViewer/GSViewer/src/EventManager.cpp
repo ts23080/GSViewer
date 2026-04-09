@@ -144,12 +144,30 @@ void EventManager::MouseMove(EVec2i p) {
     if (!m_isL && !m_isR && !m_isM) return;
     float dx = (float)(p.x() - m_prepos.x());
     float dy = (float)(p.y() - m_prepos.y());
+
     if (m_isL) {
-        m_camYaw -= dx * 0.005f; m_camPitch += dy * 0.005f;
+        // 回転操作
+        m_camYaw -= dx * 0.005f;
+        m_camPitch += dy * 0.005f;
         m_camPitch = std::max(-1.5f, std::min(1.5f, m_camPitch));
     }
-    else if (m_isR) { m_camPos.y() += dy * 0.01f; m_camPos.x() -= dx * 0.01f; }
-    else if (m_isM) { m_camDist += dy * 0.1f; }
+    else if (m_isR) {
+        // 平行移動（カメラの向きに合わせる）
+        // 現在のカメラの向きから「右ベクトル」と「上ベクトル」を計算
+        float sideX = cos(m_camYaw);
+        float sideZ = -sin(m_camYaw);
+
+        // 横方向の移動
+        m_camPos.x() -= sideX * dx * 0.01f;
+        m_camPos.z() -= sideZ * dx * 0.01f;
+
+        // 縦方向の移動（世界座標のY軸に沿わせるのが一般的）
+        m_camPos.y() += dy * 0.01f;
+    }
+    else if (m_isM) {
+        // ズーム（距離）
+        m_camDist += dy * 0.1f;
+    }
     m_prepos = p;
 }
 
