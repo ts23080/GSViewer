@@ -43,27 +43,31 @@ void Renderer::Render(int num, const float* view, const float* proj, int w, int 
     glDisable(GL_DEPTH_TEST); // 完全にオフ
     glDepthMask(GL_FALSE);    // 書き込みもオフ
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     glUseProgram(m_program);
 
-    // --- 2. 不足している Uniform の転送 ---
+    // 1. Uniformの転送 (focalLength を追加で送るのが理想です)
     glUniformMatrix4fv(glGetUniformLocation(m_program, "view"), 1, GL_FALSE, view);
     glUniformMatrix4fv(glGetUniformLocation(m_program, "projection"), 1, GL_FALSE, proj);
-    // これを忘れるとジオメトリシェーダーでサイズが0になります
     glUniform2f(glGetUniformLocation(m_program, "screenSize"), (float)w, (float)h);
 
-    // --- 3. バッファの更新と描画 ---
-    // SSBOを明示的にバインド (念のため)
+    // FOVから計算するか、固定値(例: w*0.8)を送る
+    float f = (float)h / (2.0f * tanf(0.6f / 2.0f)); // 0.6radは適当なFOV例
+    glUniform1f(glGetUniformLocation(m_program, "focalLength"), f);
+
+    // 2. SSBOのバインド
+    // Binding 0: 全スプラットデータ
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_ssbo);
 
-    // ソート済みインデックスを転送
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebo);
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, num * sizeof(unsigned int), indices);
+    // Binding 1: ソート済みインデックス (EBOをSSBOとして再利用)
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_ebo);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, num * sizeof(unsigned int), indices);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_ebo);
 
+    // 3. インスタンス描画実行
     glBindVertexArray(m_vao);
-    // インデックスバッファを使用して描画
-    glDrawElements(GL_POINTS, num, GL_UNSIGNED_INT, 0);
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, num);
 
     glBindVertexArray(0);
     glUseProgram(0);

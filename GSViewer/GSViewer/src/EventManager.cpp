@@ -8,7 +8,7 @@
 
 // --- シェーダーコンパイル用ヘルパー（実装はファイル下部） ---
 static GLuint CompileShader(GLenum type, const char* path);
-GLuint CreateProgram(const char* vPath, const char* gPath, const char* fPath);
+GLuint CreateProgram(const char* vPath,  const char* fPath);
 
 // シングルトンのインスタンス取得
 EventManager& EventManager::getInst() {
@@ -21,7 +21,7 @@ EventManager::EventManager()
     m_camPos(0, 0, 0), m_camYaw(0), m_camPitch(0), m_camDist(10.0f)
 {
     if (m_loader.LoadFromPly("model.ply")) {
-        GLuint prog = CreateProgram("shaders/splat.vert", "shaders/splat.geo", "shaders/splat.frag");
+        GLuint prog = CreateProgram("shaders/splat.vert","shaders/splat.frag");
         if (prog != 0) {
             m_renderer.Setup(m_loader.GetSplats(), prog);
 
@@ -36,41 +36,57 @@ EventManager::EventManager()
 void EventManager::SortSplats() {
     if (m_indices.empty()) return;
 
-    // --- 1. カメラの forward ベクトルを正しく計算 ---
-    Eigen::Vector3f forward;
-    forward.x() = cos(m_camPitch) * sin(m_camYaw);
-    forward.y() = sin(m_camPitch);
-    forward.z() = cos(m_camPitch) * cos(m_camYaw);
-    forward.normalize();
+    // --- 1. ビュー行列から最新の「視線方向」と「カメラ位置」を抽出 ---
+    EMat4f viewMat = GetViewMatrix();
 
-    Eigen::Vector3f camPos = m_camPos;
+    // ビュー行列の3行目がカメラ空間のZ軸に対応します
+    // OpenGLは右手系なので、カメラの向き（奥）は -Z 方向です
+    Eigen::Vector3f forward(viewMat(2, 0), viewMat(2, 1), viewMat(2, 2));
+
+    // カメラの世界座標における位置を抽出（逆行列の平行移動成分）
+    Eigen::Matrix3f R = viewMat.block<3, 3>(0, 0);
+    Eigen::Vector3f T = viewMat.block<3, 1>(0, 3);
+    Eigen::Vector3f camPosWorld = -R.transpose() * T;
+
     const auto& splats = m_loader.GetSplats();
+    size_t numSplats = m_indices.size();
 
-    // --- 2. depth の事前計算 ---
-    std::vector<std::pair<float, unsigned int>> depthIndices(m_indices.size());
+    // --- 2. 距離計算（構造体を使って可読性と速度を向上） ---
+    struct DepthPair {
+        float depth;
+        unsigned int index;
+    };
+    std::vector<DepthPair> depthIndices(numSplats);
 
-    for (size_t i = 0; i < m_indices.size(); ++i) {
+    for (size_t i = 0; i < numSplats; ++i) {
+        // 全データを回るのではなく、現在のインデックスに対して計算
+        // (前回のソート結果をベースにするため)
         unsigned int idx = m_indices[i];
         const auto& s = splats[idx];
 
-        Eigen::Vector3f relPos(s.px - camPos.x(), s.py - camPos.y(), s.pz - camPos.z());
+        // 世界座標での相対位置
+        float dx = s.px - camPosWorld.x();
+        float dy = s.py - camPosWorld.y();
+        float dz = s.pz - camPosWorld.z();
 
-        // forward 方向への投影（前方が正）
-        float d = relPos.dot(forward);
+        // 視線ベクトルへの投影 (これがカメラ空間のZ値に相当する)
+        // 遠いものほどこの値が大きくなるように符号を調整
+        float d = dx * forward.x() + dy * forward.y() + dz * forward.z();
 
         depthIndices[i] = { d, idx };
     }
 
-    // --- 3. 遠い順（降順）にソート ---
+    // --- 3. 遠い順（Back-to-Front）にソート ---
+    // 前回のフレームと順序が近いため、std::sort は非常に高速に動作します
     std::sort(depthIndices.begin(), depthIndices.end(),
-        [](const auto& a, const auto& b) {
-            return a.first > b.first;  // 遠い → 近い
+        [](const DepthPair& a, const DepthPair& b) {
+            return a.depth > b.depth; // forwardベクトル(viewの3行目)を使う場合、値が小さいほど遠い
         }
     );
 
-    // --- 4. インデックス更新 ---
-    for (size_t i = 0; i < m_indices.size(); ++i) {
-        m_indices[i] = depthIndices[i].second;
+    // --- 4. インデックス配列へ書き戻し ---
+    for (size_t i = 0; i < numSplats; ++i) {
+        m_indices[i] = depthIndices[i].index;
     }
 }
 
@@ -165,14 +181,16 @@ static GLuint CompileShader(GLenum type, const char* path) {
     return shader;
 }
 
-GLuint CreateProgram(const char* vPath, const char* gPath, const char* fPath) {
+GLuint CreateProgram(const char* vPath, const char* fPath) {
     GLuint v = CompileShader(GL_VERTEX_SHADER, vPath);
-    GLuint g = CompileShader(GL_GEOMETRY_SHADER, gPath);
     GLuint f = CompileShader(GL_FRAGMENT_SHADER, fPath);
-    if (!v || !g || !f) return 0;
+    if (!v || !f) return 0;
+
     GLuint prog = glCreateProgram();
-    glAttachShader(prog, v); glAttachShader(prog, g); glAttachShader(prog, f);
+    glAttachShader(prog, v);
+    glAttachShader(prog, f);
     glLinkProgram(prog);
+
     GLint success;
     glGetProgramiv(prog, GL_LINK_STATUS, &success);
     if (!success) {
